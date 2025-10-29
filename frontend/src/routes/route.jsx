@@ -4,6 +4,8 @@ import About from "../pages/About";
 import Contact from "../pages/Contact";
 import SignUp from "../pages/SignUp";
 import Login from "../pages/Login";
+import VotingDashboard from "../pages/VoterDashboard";
+import AdminDashboard from "../pages/AdminDashboard";
 
 
 const router = createBrowserRouter([
@@ -26,6 +28,14 @@ const router = createBrowserRouter([
     {
         path: '/login',
         element: <Login/>
+    },
+    {
+        path: '/VoterDashboard',
+        element: <VotingDashboard/>
+    },
+    {
+        path: '/AdminDashboard',
+        element: <AdminDashboard/>
     }
 ])
 
