@@ -1,14 +1,17 @@
 import React, { useState } from 'react'
 import { User, Calendar, Mail, Phone, CreditCard, Lock, Eye, EyeOff } from 'lucide-react'
 import Navbar from './Navbar'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { SignUpSchema } from "../lib/schemas"
+import { useAuth } from '../Contexts/AuthContext'
 
 const SignUp = () => {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const { signup } = useAuth()
+  const navigate = useNavigate()
 
   const {
     register,
@@ -19,6 +22,8 @@ const SignUp = () => {
   })
 
   const onSubmit = (data) => {
+    signup(data)
+    navigate('/login')
     console.log('Signup Data:', data)
   }
 

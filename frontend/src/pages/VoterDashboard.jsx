@@ -1,11 +1,21 @@
 import React, { useState } from 'react';
 import { Vote, TrendingUp, Users, CheckCircle, ArrowLeft, LogOut, User } from 'lucide-react';
+import { useAuth } from '../Contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const VotingDashboard = () => {
   const [activeTab, setActiveTab] = useState('elections');
   const [selectedElection, setSelectedElection] = useState(null);
   const [votes, setVotes] = useState({});
   const [hasVoted, setHasVoted] = useState({});
+  const {logout, user} = useAuth()
+  const navigate = useNavigate()
+  console.log(user)
+
+  const handleLogout = async ()=>{
+    logout()
+    navigate('/')
+  }
 
   const elections = [
     {
@@ -111,8 +121,9 @@ const VotingDashboard = () => {
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full">
                 <User size={20} className="text-gray-600" />
+                {user?.fullname}
               </div>
-              <button className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full transition">
+              <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full transition">
                 <LogOut size={20} />
                 <span className="font-medium">Logout</span>
               </button>
@@ -177,8 +188,9 @@ const VotingDashboard = () => {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full">
               <User size={20} className="text-gray-600" />
+              {user?.fullname}
             </div>
-            <button className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full transition">
+            <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full transition">
               <LogOut size={20} />
               <span className="font-medium">Logout</span>
             </button>

@@ -1,10 +1,19 @@
 import React, { useState } from 'react';
 import { Plus, Edit, Trash2, LogOut, User, X, Check } from 'lucide-react';
+import { useAuth } from '../Contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('elections');
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState('');
+  const {logout, user} = useAuth()
+  const navigate = useNavigate()
+
+  const handleLogout = ()=>{
+    logout()
+    navigate('/')
+  }
   
   const [elections, setElections] = useState([
     {
@@ -137,7 +146,7 @@ const AdminDashboard = () => {
               <User size={20} className="text-gray-600" />
               <span className="text-sm font-medium text-gray-700">Admin</span>
             </div>
-            <button className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full transition">
+            <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full transition">
               <LogOut size={20} />
               <span className="font-medium">Logout</span>
             </button>

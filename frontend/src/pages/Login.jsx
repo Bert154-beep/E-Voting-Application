@@ -1,13 +1,16 @@
 import React, { useState } from 'react'
 import Navbar from './Navbar'
 import { EyeIcon, EyeOff, Lock, UserIcon } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { LoginSchema } from "../lib/schemas"
+import { useAuth } from '../Contexts/AuthContext'
 
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false)
+  const { login } = useAuth()
+  const navigate = useNavigate()
 
   const {
     register,
@@ -17,7 +20,11 @@ const Login = () => {
     resolver: zodResolver(LoginSchema),
   })
 
-  const onSubmit = (data) => {
+  const onSubmit = async (data) => {
+    const success = await login(data);
+    console.log(success)
+    if (success?.role === "admin") navigate("/admindashboard");
+    else if (success?.role === "voter") navigate("/voterdashboard");
     console.log('Login Data:', data)
   }
 

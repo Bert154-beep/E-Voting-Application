@@ -6,6 +6,21 @@
 #include <iostream>
 using namespace std;
 
+struct CORS {
+    struct context {};
+    void before_handle(crow::request&, crow::response& res, context&) {
+        res.add_header("Access-Control-Allow-Origin", "*");
+        res.add_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+        res.add_header("Access-Control-Allow-Headers", "Content-Type");
+    }
+    void after_handle(crow::request&, crow::response& res, context&) {
+        res.add_header("Access-Control-Allow-Origin", "*");
+        res.add_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+        res.add_header("Access-Control-Allow-Headers", "Content-Type");
+    }
+};
+
+
 int main()
 {
     Database db;
@@ -15,7 +30,9 @@ int main()
         return 1;
     }
 
-    crow::SimpleApp app;
+    crow::App<CORS> app;
+
+    
 
     CROW_ROUTE(app, "/register").methods("POST"_method)([&db](const crow::request &req)
                                                         {
