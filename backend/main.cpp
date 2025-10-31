@@ -6,20 +6,24 @@
 #include <iostream>
 using namespace std;
 
-struct CORS {
-    struct context {};
-    void before_handle(crow::request&, crow::response& res, context&) {
+struct CORS
+{
+    struct context
+    {
+    };
+    void before_handle(crow::request &, crow::response &res, context &)
+    {
         res.add_header("Access-Control-Allow-Origin", "*");
         res.add_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
         res.add_header("Access-Control-Allow-Headers", "Content-Type");
     }
-    void after_handle(crow::request&, crow::response& res, context&) {
+    void after_handle(crow::request &, crow::response &res, context &)
+    {
         res.add_header("Access-Control-Allow-Origin", "*");
         res.add_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
         res.add_header("Access-Control-Allow-Headers", "Content-Type");
     }
 };
-
 
 int main()
 {
@@ -31,8 +35,6 @@ int main()
     }
 
     crow::App<CORS> app;
-
-    
 
     CROW_ROUTE(app, "/register").methods("POST"_method)([&db](const crow::request &req)
                                                         {
@@ -87,13 +89,37 @@ int main()
 
     CROW_ROUTE(app, "/election/create").methods("POST"_method)([&db](const crow::request &req)
                                                                {
-        auto body = crow::json::load(req.body);
-        if (!body || !body.has("name") || !body.has("description") || !body.has("date") || !body.has("status"))
-            return crow::response(400, "Missing Fields!");
-        string name = body["name"].s(), desc = body["description"].s(), date = body["date"].s(), status = body["status"].s();
-        if (db.createElection(name, desc, date, status))
-            return crow::response(200, "Election Created Successfully!");
-        return crow::response(400, "Election Creation Failed!"); });
+    auto body = crow::json::load(req.body);
+    if (!body || !body.has("name") || !body.has("description") || 
+        !body.has("election_date") || !body.has("start_date") || 
+        !body.has("end_date") || !body.has("status"))
+        return crow::response(400, "Missing Fields!");
+
+    string name = body["name"].s();
+    string desc = body["description"].s();
+    string election_date = body["election_date"].s();
+    string start_date = body["start_date"].s();
+    string end_date = body["end_date"].s();
+    string status = body["status"].s();
+
+    if (db.createElection(name, desc, election_date, start_date, end_date, status))
+        return crow::response(200, "Election Created Successfully!");
+    return crow::response(400, "Election Creation Failed!"); });
+
+    CROW_ROUTE(app, "/candidates").methods("GET"_method)([&db]() {
+    try {
+        crow::json::wvalue res = db.getAllCandidatesJson();
+        return crow::response{res};
+    } 
+    catch (const std::exception& e) {
+        std::cerr << "Error fetching candidates: " << e.what() << std::endl;
+        return crow::response(500, "Error fetching candidates");
+    } 
+    catch (...) {
+        std::cerr << "Unknown error fetching candidates." << std::endl;
+        return crow::response(500, "Unexpected error occurred");
+    }
+});
 
     CROW_ROUTE(app, "/election/delete/<int>").methods("DELETE"_method)([&db](int id)
                                                                        {
@@ -103,14 +129,38 @@ int main()
 
     CROW_ROUTE(app, "/candidate/create").methods("POST"_method)([&db](const crow::request &req)
                                                                 {
-        auto body = crow::json::load(req.body);
-        if (!body || !body.has("name") || !body.has("election_id") || !body.has("party_id"))
-            return crow::response(400, "Missing Fields!");
-        string name = body["name"].s();
-        int electionId = body["election_id"].i(), partyId = body["party_id"].i();
-        if (db.createCandidate(name, electionId, partyId))
-            return crow::response(200, "Candidate Created Successfully!");
-        return crow::response(400, "Candidate Creation Failed!"); });
+    auto body = crow::json::load(req.body);
+    if (!body || !body.has("name"))
+        return crow::response(400, "Missing candidate name!");
+
+    std::string name = body["name"].s();
+    int electionId = 0;
+    int partyId = 0;
+
+    if (body.has("election_id"))
+        electionId = body["election_id"].i();
+    else if (body.has("electionId"))
+        electionId = body["electionId"].i();
+    else
+        return crow::response(400, "Missing election ID!");
+
+    if (body.has("party_id"))
+        partyId = body["party_id"].i();
+    else if (body.has("partyId"))
+        partyId = body["partyId"].i();
+    else if (body.has("party"))
+    {
+        std::string partyName = body["party"].s();
+        partyId = db.getPartyIdByName(partyName);
+        if (partyId == 0)
+            return crow::response(400, "Party not found!");
+    }
+    else
+        return crow::response(400, "Missing party information!");
+
+    if (db.createCandidate(name, electionId, partyId))
+        return crow::response(200, "Candidate Created Successfully!");
+    return crow::response(400, "Candidate Creation Failed!"); });
 
     CROW_ROUTE(app, "/candidate/delete/<int>").methods("DELETE"_method)([&db](int id)
                                                                         {
@@ -140,6 +190,26 @@ int main()
 
     crow::json::wvalue results = db.getResultsJson(electionId);
     return crow::response(results); });
+
+CROW_ROUTE(app, "/election/finalize/<int>").methods("POST"_method)([&db](int electionId)
+{
+    if (!db.isConnected())
+        return crow::response(500, "Database not connected.");
+
+    try
+    {
+        db.finalizeElection(electionId);  
+        auto results = db.getResultsJson(electionId);  
+        results["message"] = "Election finalized successfully!";
+        return crow::response(results);
+    }
+    catch (const std::exception &e)
+    {
+        cerr << "Error finalizing election: " << e.what() << endl;
+        return crow::response(500, "Error finalizing election!");
+    }
+});
+
 
     CROW_ROUTE(app, "/parties").methods("GET"_method)([&db]()
                                                       { return crow::response(db.getAllPartiesJson()); });

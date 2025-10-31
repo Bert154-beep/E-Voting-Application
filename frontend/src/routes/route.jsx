@@ -8,7 +8,7 @@ import VotingDashboard from "../pages/VoterDashboard";
 import AdminDashboard from "../pages/AdminDashboard";
 import NotFoundPage from "../pages/NotFoundPage";
 import AccessDeniedPage from "../pages/AccessDeniedPage";
-import ProtectedRoute from "./protected-route";
+import ProtectedRoute from './protected-route'
 
 const router = createBrowserRouter([
   {

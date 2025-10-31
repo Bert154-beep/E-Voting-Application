@@ -381,25 +381,50 @@ bool Database::castVote(const string &voterCnic, int candidateId, int electionId
     return true;
 }
 
-crow::json::wvalue Database::getResultsJson(int electionId) {
+crow::json::wvalue Database::getResultsJson(int electionId)
+{
     crow::json::wvalue res;
     SQLHSTMT stmt;
     SQLAllocHandle(SQL_HANDLE_STMT, hDbc, &stmt);
 
-    string query = "SELECT id, name, votes FROM candidates WHERE election_id=" + to_string(electionId);
-    SQLExecDirect(stmt, (SQLCHAR*)query.c_str(), SQL_NTS);
+    std::string query =
+        "SELECT e.id AS election_id, e.name AS election_name, "
+        "c.id AS candidate_id, c.name AS candidate_name, c.votes "
+        "FROM elections e "
+        "JOIN candidates c ON e.id = c.election_id "
+        "WHERE e.id = " + std::to_string(electionId);
+
+    SQLRETURN ret = SQLExecDirect(stmt, (SQLCHAR*)query.c_str(), SQL_NTS);
+    if (!SQL_SUCCEEDED(ret))
+    {
+        SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+        res["error"] = "Failed to execute query.";
+        return res;
+    }
+
+    SQLINTEGER election_id, candidate_id, votes;
+    SQLCHAR election_name[100], candidate_name[100];
 
     int idx = 0;
-    SQLINTEGER id, votes;
-    SQLCHAR name[100];
+    bool electionSet = false;
 
-    while (SQLFetch(stmt) == SQL_SUCCESS) {
-        SQLGetData(stmt, 1, SQL_C_SLONG, &id, 0, NULL);
-        SQLGetData(stmt, 2, SQL_C_CHAR, name, sizeof(name), NULL);
-        SQLGetData(stmt, 3, SQL_C_SLONG, &votes, 0, NULL);
+    while (SQLFetch(stmt) == SQL_SUCCESS)
+    {
+        SQLGetData(stmt, 1, SQL_C_SLONG, &election_id, 0, NULL);
+        SQLGetData(stmt, 2, SQL_C_CHAR, election_name, sizeof(election_name), NULL);
+        SQLGetData(stmt, 3, SQL_C_SLONG, &candidate_id, 0, NULL);
+        SQLGetData(stmt, 4, SQL_C_CHAR, candidate_name, sizeof(candidate_name), NULL);
+        SQLGetData(stmt, 5, SQL_C_SLONG, &votes, 0, NULL);
 
-        res["candidates"][idx]["id"] = (int)id;
-        res["candidates"][idx]["name"] = string((char*)name);
+        if (!electionSet)
+        {
+            res["election"]["id"] = (int)election_id;
+            res["election"]["name"] = std::string((char*)election_name);
+            electionSet = true;
+        }
+
+        res["candidates"][idx]["id"] = (int)candidate_id;
+        res["candidates"][idx]["name"] = std::string((char*)candidate_name);
         res["candidates"][idx]["votes"] = (int)votes;
         idx++;
     }
@@ -407,6 +432,7 @@ crow::json::wvalue Database::getResultsJson(int electionId) {
     SQLFreeHandle(SQL_HANDLE_STMT, stmt);
     return res;
 }
+
 
 void Database::loadParties()
 {
@@ -472,11 +498,16 @@ bool Database::deleteParty(int id)
     return SQL_SUCCEEDED(ret);
 }
 
-bool Database::createElection(const string &name, const string &desc, const string &date, const string &status)
+bool Database::createElection(const string &name, const string &desc,
+                              const string &election_date, const string &start_date,
+                              const string &end_date, const string &status)
 {
     SQLHSTMT stmt;
     SQLAllocHandle(SQL_HANDLE_STMT, hDbc, &stmt);
-    string q = "INSERT INTO elections(name,description,election_date,status) VALUES('" + name + "','" + desc + "','" + date + "','" + status + "')";
+    string q =
+        "INSERT INTO elections(name, description, election_date, start_date, end_date, status) "
+        "VALUES('" +
+        name + "','" + desc + "','" + election_date + "','" + start_date + "','" + end_date + "','" + status + "')";
     SQLRETURN ret = SQLExecDirect(stmt, (SQLCHAR *)q.c_str(), SQL_NTS);
     SQLFreeHandle(SQL_HANDLE_STMT, stmt);
     return SQL_SUCCEEDED(ret);
@@ -517,15 +548,17 @@ void Database::finalizeElection(int electionId)
     SQLHSTMT stmt;
     SQLAllocHandle(SQL_HANDLE_STMT, hDbc, &stmt);
 
-    SQLExecDirect(stmt, (SQLCHAR*)"UPDATE parties SET seats_held = 0", SQL_NTS);
+    SQLExecDirect(stmt, (SQLCHAR *)"UPDATE parties SET seats_held = 0", SQL_NTS);
 
     string q = "SELECT party_id, COUNT(*) as total_votes "
-               "FROM votes WHERE election_id=" + to_string(electionId) +
+               "FROM votes WHERE election_id=" +
+               to_string(electionId) +
                " GROUP BY party_id";
-    SQLExecDirect(stmt, (SQLCHAR*)q.c_str(), SQL_NTS);
+    SQLExecDirect(stmt, (SQLCHAR *)q.c_str(), SQL_NTS);
 
     SQLINTEGER partyId, votes;
-    while (SQLFetch(stmt) == SQL_SUCCESS) {
+    while (SQLFetch(stmt) == SQL_SUCCESS)
+    {
         SQLGetData(stmt, 1, SQL_C_SLONG, &partyId, 0, NULL);
         SQLGetData(stmt, 2, SQL_C_SLONG, &votes, 0, NULL);
 
@@ -533,7 +566,7 @@ void Database::finalizeElection(int electionId)
                         " WHERE id = " + to_string(partyId);
         SQLHSTMT updateStmt;
         SQLAllocHandle(SQL_HANDLE_STMT, hDbc, &updateStmt);
-        SQLExecDirect(updateStmt, (SQLCHAR*)update.c_str(), SQL_NTS);
+        SQLExecDirect(updateStmt, (SQLCHAR *)update.c_str(), SQL_NTS);
         SQLFreeHandle(SQL_HANDLE_STMT, updateStmt);
     }
 
@@ -541,7 +574,8 @@ void Database::finalizeElection(int electionId)
     cout << "Election " << electionId << " finalized. Party seats updated.\n";
 }
 
-crow::json::wvalue Database::getAllPartiesJson() {
+crow::json::wvalue Database::getAllPartiesJson()
+{
     crow::json::wvalue res;
     res["parties"] = crow::json::wvalue::list();
     SQLHSTMT stmt;
@@ -552,7 +586,8 @@ crow::json::wvalue Database::getAllPartiesJson() {
     SQLCHAR name[100], color[50];
     int idx = 0;
 
-    while (SQLFetch(stmt) == SQL_SUCCESS) {
+    while (SQLFetch(stmt) == SQL_SUCCESS)
+    {
         SQLGetData(stmt, 1, SQL_C_SLONG, &id, 0, NULL);
         SQLGetData(stmt, 2, SQL_C_CHAR, name, sizeof(name), NULL);
         SQLGetData(stmt, 3, SQL_C_CHAR, color, sizeof(color), NULL);
@@ -571,7 +606,8 @@ crow::json::wvalue Database::getAllPartiesJson() {
     return res;
 }
 
-crow::json::wvalue Database::getAllElectionsJson() {
+crow::json::wvalue Database::getAllElectionsJson()
+{
     crow::json::wvalue res;
     res["elections"] = crow::json::wvalue::list();
     SQLHSTMT stmt;
@@ -582,7 +618,8 @@ crow::json::wvalue Database::getAllElectionsJson() {
     SQLCHAR name[100], desc[255], date[30], status[20];
     int idx = 0;
 
-    while (SQLFetch(stmt) == SQL_SUCCESS) {
+    while (SQLFetch(stmt) == SQL_SUCCESS)
+    {
         SQLGetData(stmt, 1, SQL_C_SLONG, &id, 0, NULL);
         SQLGetData(stmt, 2, SQL_C_CHAR, name, sizeof(name), NULL);
         SQLGetData(stmt, 3, SQL_C_CHAR, desc, sizeof(desc), NULL);
@@ -600,4 +637,68 @@ crow::json::wvalue Database::getAllElectionsJson() {
     SQLFreeHandle(SQL_HANDLE_STMT, stmt);
     return res;
 }
+
+int Database::getPartyIdByName(const string &name)
+{
+    SQLHSTMT stmt;
+    SQLAllocHandle(SQL_HANDLE_STMT, hDbc, &stmt);
+    string q = "SELECT id FROM parties WHERE name='" + name + "' LIMIT 1";
+    SQLRETURN ret = SQLExecDirect(stmt, (SQLCHAR *)q.c_str(), SQL_NTS);
+    int id = 0;
+    if (SQL_SUCCEEDED(ret) && SQLFetch(stmt) == SQL_SUCCESS)
+    {
+        SQLINTEGER pid;
+        SQLGetData(stmt, 1, SQL_C_SLONG, &pid, 0, NULL);
+        id = static_cast<int>(pid);
+    }
+    SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+    return id;
+}
+
+crow::json::wvalue Database::getAllCandidatesJson()
+{
+    crow::json::wvalue result;
+    result["candidates"] = crow::json::wvalue::list();
+    SQLHSTMT stmt;
+    SQLAllocHandle(SQL_HANDLE_STMT, hDbc, &stmt);
+
+    std::string query =
+        "SELECT c.id, c.name, p.name AS party_name, e.name AS election_name, "
+        "c.votes, c.election_id, c.party_id "
+        "FROM candidates c "
+        "LEFT JOIN parties p ON c.party_id = p.id "
+        "LEFT JOIN elections e ON c.election_id = e.id";
+
+    if (SQLExecDirect(stmt, (SQLCHAR*)query.c_str(), SQL_NTS) != SQL_SUCCESS) {
+        SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+        return result;
+    }
+
+    int id, votes, election_id, party_id;
+    SQLCHAR candidate_name[255], party_name[255], election_name[255];
+    int idx = 0;
+
+    while (SQLFetch(stmt) == SQL_SUCCESS) {
+        SQLGetData(stmt, 1, SQL_C_SLONG, &id, 0, NULL);
+        SQLGetData(stmt, 2, SQL_C_CHAR, candidate_name, sizeof(candidate_name), NULL);
+        SQLGetData(stmt, 3, SQL_C_CHAR, party_name, sizeof(party_name), NULL);
+        SQLGetData(stmt, 4, SQL_C_CHAR, election_name, sizeof(election_name), NULL);
+        SQLGetData(stmt, 5, SQL_C_SLONG, &votes, 0, NULL);
+        SQLGetData(stmt, 6, SQL_C_SLONG, &election_id, 0, NULL);
+        SQLGetData(stmt, 7, SQL_C_SLONG, &party_id, 0, NULL);
+
+        result["candidates"][idx]["id"] = id;
+        result["candidates"][idx]["name"] = std::string((char*)candidate_name);
+        result["candidates"][idx]["party"] = std::string((char*)party_name);
+        result["candidates"][idx]["party_id"] = party_id;
+        result["candidates"][idx]["election"] = std::string((char*)election_name);
+        result["candidates"][idx]["election_id"] = election_id;
+        result["candidates"][idx]["votes"] = votes;
+        idx++;
+    }
+
+    SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+    return result;
+}
+
 
