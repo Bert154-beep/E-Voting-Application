@@ -113,11 +113,7 @@ export default function AdminContextProvider({ children }) {
 };
 
 
-  useEffect(() => {
-    fetchParties();
-    fetchElections();
-    fetchCandidates();
-  }, []);
+
 
   return (
     <AdminContext.Provider

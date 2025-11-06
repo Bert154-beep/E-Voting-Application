@@ -18,21 +18,48 @@ void PartyList::insert(int id, const string &name, const string &color, int memb
     temp->next = newNode;
 }
 
-bool VotedUserList::exists(int voterId)
+VotedUserList::Node::Node(int v, int e, int c)
+    : voterId(v), electionId(e), candidateId(c), next(nullptr) {}
+
+VotedUserList::VotedUserList() : head(nullptr) {}
+
+VotedUserList::~VotedUserList()
+{
+    while (head)
+    {
+        Node *t = head;
+        head = head->next;
+        delete t;
+    }
+}
+
+bool VotedUserList::existsInElection(int voterId, int electionId)
 {
     Node *temp = head;
     while (temp)
     {
-        if (temp->id == voterId)
+        if (temp->voterId == voterId && temp->electionId == electionId)
             return true;
         temp = temp->next;
     }
     return false;
 }
 
-void VotedUserList::insert(int voterId)
+bool VotedUserList::existsForCandidate(int voterId, int candidateId)
 {
-    Node *newNode = new Node(voterId);
+    Node *temp = head;
+    while (temp)
+    {
+        if (temp->voterId == voterId && temp->candidateId == candidateId)
+            return true;
+        temp = temp->next;
+    }
+    return false;
+}
+
+void VotedUserList::insert(int voterId, int electionId, int candidateId)
+{
+    Node *newNode = new Node(voterId, electionId, candidateId);
     newNode->next = head;
     head = newNode;
 }
@@ -326,9 +353,15 @@ bool Database::castVote(const string &voterCnic, int candidateId, int electionId
     SQLGetData(stmt, 1, SQL_C_SLONG, &voterId, 0, NULL);
     SQLFreeHandle(SQL_HANDLE_STMT, stmt);
 
-    if (votedUsers.exists(voterId))
+    if (votedUsers.existsForCandidate(voterId, candidateId))
     {
-        cerr << "Duplicate vote attempt blocked.\n";
+        cerr << "You have already voted for this candidate.\n";
+        return false;
+    }
+
+    if (votedUsers.existsInElection(voterId, electionId))
+    {
+        cerr << "You have already voted in this election.\n";
         return false;
     }
 
@@ -373,7 +406,7 @@ bool Database::castVote(const string &voterCnic, int candidateId, int electionId
         return false;
     }
 
-    votedUsers.insert(voterId);
+    votedUsers.insert(voterId, electionId, candidateId);
     auditQueue.push("Vote cast by CNIC " + voterCnic + " for candidate " + to_string(candidateId));
 
     cout << "Vote successfully cast for candidate " << candidateId
@@ -392,9 +425,10 @@ crow::json::wvalue Database::getResultsJson(int electionId)
         "c.id AS candidate_id, c.name AS candidate_name, c.votes "
         "FROM elections e "
         "JOIN candidates c ON e.id = c.election_id "
-        "WHERE e.id = " + std::to_string(electionId);
+        "WHERE e.id = " +
+        std::to_string(electionId);
 
-    SQLRETURN ret = SQLExecDirect(stmt, (SQLCHAR*)query.c_str(), SQL_NTS);
+    SQLRETURN ret = SQLExecDirect(stmt, (SQLCHAR *)query.c_str(), SQL_NTS);
     if (!SQL_SUCCEEDED(ret))
     {
         SQLFreeHandle(SQL_HANDLE_STMT, stmt);
@@ -419,12 +453,12 @@ crow::json::wvalue Database::getResultsJson(int electionId)
         if (!electionSet)
         {
             res["election"]["id"] = (int)election_id;
-            res["election"]["name"] = std::string((char*)election_name);
+            res["election"]["name"] = std::string((char *)election_name);
             electionSet = true;
         }
 
         res["candidates"][idx]["id"] = (int)candidate_id;
-        res["candidates"][idx]["name"] = std::string((char*)candidate_name);
+        res["candidates"][idx]["name"] = std::string((char *)candidate_name);
         res["candidates"][idx]["votes"] = (int)votes;
         idx++;
     }
@@ -432,7 +466,6 @@ crow::json::wvalue Database::getResultsJson(int electionId)
     SQLFreeHandle(SQL_HANDLE_STMT, stmt);
     return res;
 }
-
 
 void Database::loadParties()
 {
@@ -669,7 +702,8 @@ crow::json::wvalue Database::getAllCandidatesJson()
         "LEFT JOIN parties p ON c.party_id = p.id "
         "LEFT JOIN elections e ON c.election_id = e.id";
 
-    if (SQLExecDirect(stmt, (SQLCHAR*)query.c_str(), SQL_NTS) != SQL_SUCCESS) {
+    if (SQLExecDirect(stmt, (SQLCHAR *)query.c_str(), SQL_NTS) != SQL_SUCCESS)
+    {
         SQLFreeHandle(SQL_HANDLE_STMT, stmt);
         return result;
     }
@@ -678,7 +712,8 @@ crow::json::wvalue Database::getAllCandidatesJson()
     SQLCHAR candidate_name[255], party_name[255], election_name[255];
     int idx = 0;
 
-    while (SQLFetch(stmt) == SQL_SUCCESS) {
+    while (SQLFetch(stmt) == SQL_SUCCESS)
+    {
         SQLGetData(stmt, 1, SQL_C_SLONG, &id, 0, NULL);
         SQLGetData(stmt, 2, SQL_C_CHAR, candidate_name, sizeof(candidate_name), NULL);
         SQLGetData(stmt, 3, SQL_C_CHAR, party_name, sizeof(party_name), NULL);
@@ -688,10 +723,10 @@ crow::json::wvalue Database::getAllCandidatesJson()
         SQLGetData(stmt, 7, SQL_C_SLONG, &party_id, 0, NULL);
 
         result["candidates"][idx]["id"] = id;
-        result["candidates"][idx]["name"] = std::string((char*)candidate_name);
-        result["candidates"][idx]["party"] = std::string((char*)party_name);
+        result["candidates"][idx]["name"] = std::string((char *)candidate_name);
+        result["candidates"][idx]["party"] = std::string((char *)party_name);
         result["candidates"][idx]["party_id"] = party_id;
-        result["candidates"][idx]["election"] = std::string((char*)election_name);
+        result["candidates"][idx]["election"] = std::string((char *)election_name);
         result["candidates"][idx]["election_id"] = election_id;
         result["candidates"][idx]["votes"] = votes;
         idx++;
@@ -701,4 +736,32 @@ crow::json::wvalue Database::getAllCandidatesJson()
     return result;
 }
 
+bool Database::hasVoted(const std::string &cnic, int electionId)
+{
+    SQLHSTMT stmt;
+    SQLRETURN ret;
+    SQLAllocHandle(SQL_HANDLE_STMT, hDbc, &stmt);
+
+    std::string query =
+        "SELECT COUNT(*) FROM votes v "
+        "JOIN users u ON v.voter_id = u.id "
+        "WHERE u.cnic_number = '" + cnic + "' AND v.election_id = " + std::to_string(electionId);
+
+    ret = SQLExecDirect(stmt, (SQLCHAR *)query.c_str(), SQL_NTS);
+    if (!SQL_SUCCEEDED(ret))
+    {
+        SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+        std::cerr << "Error executing hasVoted query.\n";
+        return false;
+    }
+
+    SQLINTEGER count = 0;
+    if (SQLFetch(stmt) == SQL_SUCCESS)
+    {
+        SQLGetData(stmt, 1, SQL_C_SLONG, &count, 0, NULL);
+    }
+
+    SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+    return count > 0;
+}
 

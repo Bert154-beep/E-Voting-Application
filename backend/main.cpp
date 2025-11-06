@@ -106,7 +106,8 @@ int main()
         return crow::response(200, "Election Created Successfully!");
     return crow::response(400, "Election Creation Failed!"); });
 
-    CROW_ROUTE(app, "/candidates").methods("GET"_method)([&db]() {
+    CROW_ROUTE(app, "/candidates").methods("GET"_method)([&db]()
+                                                         {
     try {
         crow::json::wvalue res = db.getAllCandidatesJson();
         return crow::response{res};
@@ -118,8 +119,7 @@ int main()
     catch (...) {
         std::cerr << "Unknown error fetching candidates." << std::endl;
         return crow::response(500, "Unexpected error occurred");
-    }
-});
+    } });
 
     CROW_ROUTE(app, "/election/delete/<int>").methods("DELETE"_method)([&db](int id)
                                                                        {
@@ -191,8 +191,8 @@ int main()
     crow::json::wvalue results = db.getResultsJson(electionId);
     return crow::response(results); });
 
-CROW_ROUTE(app, "/election/finalize/<int>").methods("POST"_method)([&db](int electionId)
-{
+    CROW_ROUTE(app, "/election/finalize/<int>").methods("POST"_method)([&db](int electionId)
+                                                                       {
     if (!db.isConnected())
         return crow::response(500, "Database not connected.");
 
@@ -207,15 +207,33 @@ CROW_ROUTE(app, "/election/finalize/<int>").methods("POST"_method)([&db](int ele
     {
         cerr << "Error finalizing election: " << e.what() << endl;
         return crow::response(500, "Error finalizing election!");
-    }
-});
-
+    } });
 
     CROW_ROUTE(app, "/parties").methods("GET"_method)([&db]()
                                                       { return crow::response(db.getAllPartiesJson()); });
 
     CROW_ROUTE(app, "/elections").methods("GET"_method)([&db]()
                                                         { return crow::response(db.getAllElectionsJson()); });
+
+    CROW_ROUTE(app, "/hasVoted").methods("GET"_method)([&db](const crow::request &req)
+                                                       {
+    auto query = crow::query_string(req.url_params);
+
+    if (!query.get("cnic") || !query.get("election_id"))
+        return crow::response(400, "Missing CNIC or election_id");
+
+    string cnic = query.get("cnic");
+    int electionId = stoi(query.get("election_id"));
+
+    try {
+        bool voted = db.hasVoted(cnic, electionId);
+        crow::json::wvalue res;
+        res["hasVoted"] = voted;
+        return crow::response(res);
+    } catch (const std::exception &e) {
+        cerr << "Error checking vote status: " << e.what() << endl;
+        return crow::response(500, "Error checking vote status");
+    } });
 
     cout << "Server is running at http://localhost:18080" << endl;
     app.port(18080).multithreaded().run();

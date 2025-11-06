@@ -63,10 +63,20 @@ const fetchResults = async (electionId) => {
     toast.error("Failed to load election results!");
   }
 };
-  useEffect(() => {
-    fetchElections();
-    fetchParties();
-  }, []);
+
+const checkVoteStatus = async (cnic, electionId) => {
+  try {
+    const res = await api.get(`/hasVoted?cnic=${cnic}&election_id=${electionId}`);
+    const voted = res.data?.hasVoted ?? false;
+    setHasVoted(prev => ({ ...prev, [electionId]: voted }));
+    return voted;
+  } catch {
+    toast.error("Failed to check voting status!");
+    return false;
+  }
+};
+
+
 
   return (
     <VotingContext.Provider
@@ -81,7 +91,8 @@ const fetchResults = async (electionId) => {
         fetchCandidates,
         fetchResults,
         castVote,
-        setHasVoted
+        setHasVoted,
+        checkVoteStatus
       }}
     >
       {children}

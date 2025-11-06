@@ -25,6 +25,7 @@ const VotingDashboard = () => {
     fetchCandidates,
     fetchResults,
     castVote,
+    checkVoteStatus
   } = useVoting();
 
   const [activeTab, setActiveTab] = useState("elections");
@@ -45,18 +46,30 @@ const VotingDashboard = () => {
     setSelectedElection(election);
     await fetchCandidates(election.id);
     await fetchResults(election.id);
+
+    const voted = await checkVoteStatus(user?.cnic_number, election?.id);
+    setHasVoted((prev) => ({
+      ...prev,
+      [election.id]: voted,
+    }));
   };
 
-  const handleVote = async (electionId, candidateId) => {
-    if (hasVoted[electionId]) return alert("You have already voted!");
-    await castVote({
-      cnic: user.cnic_number,
-      election_id: electionId,
-      candidate_id: candidateId,
-    });
-    setHasVoted((prev) => ({ ...prev, [electionId]: true }));
-    await fetchResults(electionId);
-  };
+
+ const handleVote = async (electionId, candidateId) => {
+  if (hasVoted[electionId]) return alert("You have already voted!");
+
+  await castVote({
+    cnic: user.cnic_number,
+    election_id: electionId,
+    candidate_id: candidateId,
+  });
+
+  await fetchResults(electionId);
+  const voted = await checkVoteStatus(user?.cnic_number, electionId);
+  setHasVoted((prev) => ({ ...prev, [electionId]: voted }));
+
+  alert("Vote submitted successfully!");
+};
 
   const getVoteCount = (candidateId) => {
     if (!results) return 0;
@@ -275,93 +288,93 @@ const VotingDashboard = () => {
             ))}
           </div>
         )}
-{activeTab === "results" && (
-  <div className="space-y-6">
-    <div className="mb-6">
-      <label className="block text-gray-700 font-semibold mb-2">
-        Select Election:
-      </label>
-      <select
-        onChange={(e) => {
-          const id = parseInt(e.target.value);
-          if (id) fetchResults(id);
-        }}
-        className="border border-gray-300 rounded-lg px-4 py-2 w-full"
-        defaultValue=""
-      >
-        <option value="" disabled>
-          -- Choose an election --
-        </option>
-        {elections.map((election) => (
-          <option key={election.id} value={election.id}>
-            {election.name}
-          </option>
-        ))}
-      </select>
-    </div>
-
-    {Object.keys(results).length === 0 ? (
-      <p className="text-gray-600">No results loaded yet.</p>
-    ) : (
-      Object.values(results).map((electionResults) => {
-        const { election, candidates } = electionResults;
-
-        if (!candidates?.length) {
-          return (
-            <div
-              key={election.id}
-              className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
-            >
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                {election.name}
-              </h3>
-              <p className="text-gray-600">No results available yet.</p>
+        {activeTab === "results" && (
+          <div className="space-y-6">
+            <div className="mb-6">
+              <label className="block text-gray-700 font-semibold mb-2">
+                Select Election:
+              </label>
+              <select
+                onChange={(e) => {
+                  const id = parseInt(e.target.value);
+                  if (id) fetchResults(id);
+                }}
+                className="border border-gray-300 rounded-lg px-4 py-2 w-full"
+                defaultValue=""
+              >
+                <option value="" disabled>
+                  -- Choose an election --
+                </option>
+                {elections.map((election) => (
+                  <option key={election.id} value={election.id}>
+                    {election.name}
+                  </option>
+                ))}
+              </select>
             </div>
-          );
-        }
 
-        const totalVotes = candidates.reduce(
-          (sum, c) => sum + (c.votes || 0),
-          0
-        );
+            {Object.keys(results).length === 0 ? (
+              <p className="text-gray-600">No results loaded yet.</p>
+            ) : (
+              Object.values(results).map((electionResults) => {
+                const { election, candidates } = electionResults;
 
-        return (
-          <div
-            key={election.id}
-            className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
-          >
-            <h3 className="text-2xl font-bold text-gray-900 mb-4">
-              {election.name}
-            </h3>
-
-            {candidates.map((candidate) => {
-              const percentage = totalVotes
-                ? ((candidate.votes / totalVotes) * 100).toFixed(1)
-                : 0;
-
-              return (
-                <div key={candidate.id} className="mb-4">
-                  <div className="flex justify-between mb-1">
-                    <span>{candidate.name}</span>
-                    <span>
-                      {candidate.votes} votes ({percentage}%)
-                    </span>
-                  </div>
-                  <div className="w-full h-3 bg-gray-200 rounded-full">
+                if (!candidates?.length) {
+                  return (
                     <div
-                      className="bg-blue-600 h-3 rounded-full"
-                      style={{ width: `${percentage}%` }}
-                    ></div>
+                      key={election.id}
+                      className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
+                    >
+                      <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                        {election.name}
+                      </h3>
+                      <p className="text-gray-600">No results available yet.</p>
+                    </div>
+                  );
+                }
+
+                const totalVotes = candidates.reduce(
+                  (sum, c) => sum + (c.votes || 0),
+                  0
+                );
+
+                return (
+                  <div
+                    key={election.id}
+                    className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
+                  >
+                    <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                      {election.name}
+                    </h3>
+
+                    {candidates.map((candidate) => {
+                      const percentage = totalVotes
+                        ? ((candidate.votes / totalVotes) * 100).toFixed(1)
+                        : 0;
+
+                      return (
+                        <div key={candidate.id} className="mb-4">
+                          <div className="flex justify-between mb-1">
+                            <span>{candidate.name}</span>
+                            <span>
+                              {candidate.votes} votes ({percentage}%)
+                            </span>
+                          </div>
+                          <div className="w-full h-3 bg-gray-200 rounded-full">
+                            <div
+                              className="bg-blue-600 h-3 rounded-full"
+                              style={{ width: `${percentage}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
-        );
-      })
-    )}
-  </div>
-)}
+        )}
 
 
 

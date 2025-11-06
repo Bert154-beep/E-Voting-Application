@@ -177,30 +177,26 @@ public:
     }
 };
 
-class VotedUserList
-{
-    struct Node
-    {
-        int id;
-        Node *next;
-        Node(int i) : id(i), next(nullptr) {}
+class VotedUserList {
+private:
+    struct Node {
+        int voterId;
+        int electionId;
+        int candidateId;
+        Node* next;
+        Node(int v, int e, int c);
     };
-    Node *head;
+    Node* head;
 
 public:
-    VotedUserList() : head(nullptr) {}
-    ~VotedUserList()
-    {
-        while (head)
-        {
-            Node *t = head;
-            head = head->next;
-            delete t;
-        }
-    }
-    bool exists(int id);
-    void insert(int id);
+    VotedUserList();
+    ~VotedUserList();
+    bool existsInElection(int voterId, int electionId);
+    bool existsForCandidate(int voterId, int candidateId);
+    void insert(int voterId, int electionId, int candidateId);
 };
+
+
 
 template <typename T>
 struct CustomOptional
@@ -317,5 +313,6 @@ public:
     crow::json::wvalue getAllPartiesJson();
     crow::json::wvalue getAllElectionsJson();
     crow::json::wvalue getAllCandidatesJson();
+    bool hasVoted(const std::string& cnic, int electionId);
 
 };

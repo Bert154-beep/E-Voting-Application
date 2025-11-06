@@ -6,9 +6,12 @@ const ProtectedRoute = ({ children }) => {
   const { user } = useAuth();
 
     console.log("ProtectedRoute user:", user);
+  
+  if(!user){
+    return <Navigate to="/" replace/>
+  }
 
-
-  if (!user) {
+  if (!user.role) {
     return <Navigate to="/unauthorized" replace />;
   }
 
