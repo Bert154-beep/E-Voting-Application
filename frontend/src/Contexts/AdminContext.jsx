@@ -8,6 +8,7 @@ export default function AdminContextProvider({ children }) {
   const [parties, setParties] = useState([]);
   const [elections, setElections] = useState([]);
   const [candidates, setCandidates] = useState([]);
+  const [Results, setResults] = useState([])
 
   const fetchParties = async () => {
     try {
@@ -107,8 +108,9 @@ export default function AdminContextProvider({ children }) {
       [electionId]: res.data.candidates || [],
     }));
     toast.success(res.data.message || "Election finalized!");
-  } catch {
+  } catch (error){
     toast.error("Failed to finalize election!");
+    console.log(error)
   }
 };
 

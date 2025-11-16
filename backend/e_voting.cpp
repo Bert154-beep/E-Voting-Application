@@ -584,8 +584,7 @@ void Database::finalizeElection(int electionId)
     SQLExecDirect(stmt, (SQLCHAR *)"UPDATE parties SET seats_held = 0", SQL_NTS);
 
     string q = "SELECT party_id, COUNT(*) as total_votes "
-               "FROM votes WHERE election_id=" +
-               to_string(electionId) +
+               "FROM votes WHERE election_id=" + to_string(electionId) +
                " GROUP BY party_id";
     SQLExecDirect(stmt, (SQLCHAR *)q.c_str(), SQL_NTS);
 
@@ -604,6 +603,13 @@ void Database::finalizeElection(int electionId)
     }
 
     SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+
+    SQLHSTMT statusStmt;
+    SQLAllocHandle(SQL_HANDLE_STMT, hDbc, &statusStmt);
+    string statusUpdate = "UPDATE elections SET status='Ended' WHERE id=" + to_string(electionId);
+    SQLExecDirect(statusStmt, (SQLCHAR *)statusUpdate.c_str(), SQL_NTS);
+    SQLFreeHandle(SQL_HANDLE_STMT, statusStmt);
+
     cout << "Election " << electionId << " finalized. Party seats updated.\n";
 }
 

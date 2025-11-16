@@ -36,6 +36,8 @@ const VotingDashboard = () => {
     fetchElections();
     fetchParties();
   }, []);
+  
+  const activeElections = elections.filter((e) => e.status !== "Ended");
 
   const handleLogout = () => {
     logout();
@@ -258,7 +260,7 @@ const VotingDashboard = () => {
 
         {activeTab === "elections" && (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {elections.map((election) => (
+            {activeElections.map((election) => (
               <div
                 key={election.id}
                 onClick={() =>

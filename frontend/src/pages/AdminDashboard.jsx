@@ -26,6 +26,7 @@ const AdminDashboard = () => {
     deleteElection,
     deleteCandidate,
     deleteParty,
+    finalizeElection
   } = useAdmin();
 
   useEffect(() => {
@@ -69,9 +70,10 @@ const AdminDashboard = () => {
       }
       closeModal();
     } catch {
-      // handled by toast in context
     }
   };
+
+
 
   const colorOptions = [
     { value: "bg-blue-500", label: "Blue" },
@@ -154,29 +156,32 @@ const AdminDashboard = () => {
 
                       <p
                         className={`mt-1 inline-block px-3 py-1 rounded-full text-sm ${e.status === "active"
-                          ? "bg-green-100 text-green-700"
-                          : e.status === "upcoming"
-                            ? "bg-yellow-100 text-yellow-700"
-                            : "bg-gray-100 text-gray-700"
+                            ? "bg-green-100 text-green-700"
+                            : e.status === "upcoming"
+                              ? "bg-yellow-100 text-yellow-700"
+                              : e.status === "Ended"
+                                ? "bg-gray-200 text-gray-800" 
+                                : "bg-gray-100 text-gray-700"
                           }`}
                       >
-                        {e.status}
+                        {e.status === "Ended" ? "Finalized" : e.status}
                       </p>
+
                     </div>
-                  <div className="flex flex-col">
+                    <div className="flex flex-col">
                       <button
-                      onClick={() => deleteElection(e.id)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                    >
-                      <Trash2 size={20} />
-                    </button>
-                    <button
-                      onClick={() => finalizeElection(election.id)}
-                      className="hover:bg-green-50 text-green-700 p-2 rounded-lg"
-                    >
-                      <CircleChevronRight />
-                    </button>
-                  </div>
+                        onClick={() => deleteElection(e.id)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                      >
+                        <Trash2 size={20} />
+                      </button>
+                      <button
+                        onClick={() => finalizeElection(e.id)}
+                        className="hover:bg-green-50 text-green-700 p-2 rounded-lg"
+                      >
+                        <CircleChevronRight />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
